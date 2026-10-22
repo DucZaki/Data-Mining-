@@ -75,7 +75,7 @@ Tuy nhiên, **đồng xuất hiện không chứng minh hiệu quả**. Sau ki�
 ```text
 .
 ├── data/
-│   ├── raw/valorant.sqlite          # dữ liệu gốc, không commit (~76 MB)
+│   ├── raw/valorant.sqlite          # dữ liệu gốc (~76 MB)
 │   ├── processed/                   # dữ liệu sinh bởi pipeline, không commit
 │   └── README.md                    # mô tả các bảng gốc
 ├── src/valorant_mining/
@@ -145,7 +145,9 @@ make setup
 # hoặc: pip install -r requirements.txt
 ```
 
-Nếu chưa có dữ liệu, copy file `valorant.sqlite` vào `data/raw/`. File này không được commit vì dung lượng khoảng 76 MB.
+Repo đã kèm sẵn `data/raw/valorant.sqlite` (~76 MB), nên không cần copy thêm. Nếu thay bằng bản dữ liệu khác, đặt cùng tên tại `data/raw/valorant.sqlite` rồi chạy lại `make all`.
+
+> Lưu ý: do chứa file dữ liệu gốc, lần clone đầu tiên sẽ lâu hơn bình thường.
 
 ### Chạy toàn bộ pipeline
 

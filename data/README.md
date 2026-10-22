@@ -1,9 +1,9 @@
 # Dữ liệu
 
-- `raw/valorant.sqlite`: dữ liệu gốc (khoảng 76 MB).
+- `raw/valorant.sqlite`: dữ liệu gốc, **đã commit** (khoảng 76 MB).
 - `processed/`: dữ liệu sinh ra bởi `scripts/01_build_datasets.py`, không commit.
 
-Đặt file gốc vào `data/raw/valorant.sqlite` trước khi chạy pipeline.
+File gốc đã có sẵn tại `data/raw/valorant.sqlite`. Nếu thay bằng bản dữ liệu khác, đặt cùng tên rồi chạy lại `make all`.
 
 Các bảng gốc:
 
