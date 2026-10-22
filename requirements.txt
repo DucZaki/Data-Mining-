@@ -7,3 +7,4 @@ seaborn>=0.12
 mlxtend>=0.23
 jupyterlab>=4.0
 nbformat>=5.7
+python-pptx>=1.0

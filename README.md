@@ -170,6 +170,14 @@ Thời gian chạy khoảng **1–2 phút** trên laptop thông thường. Kết
 
 > `make clean` sẽ xoá dữ liệu đã xử lý, bảng kết quả và hình. Chỉ dùng khi muốn chạy lại từ đầu.
 
+### Tạo slide bảo vệ
+
+```bash
+make slides
+```
+
+Lệnh này tạo `slides/valorant_mining_slides.pptx` — bộ 15 slide 16:9 tiếng Việt, có speaker notes — và các hình minh hoạ trong `slides/assets/`. Slide đọc trực tiếp từ `outputs/tables/`, nên cần chạy `make all` trước.
+
 ---
 
 ## 5. Phương pháp
@@ -222,6 +230,7 @@ Thời gian chạy khoảng **1–2 phút** trên laptop thông thường. Kết
 - [`reports/02_du_lieu_khai_pha.md`](reports/02_du_lieu_khai_pha.md) — nhật ký xây dựng tập dữ liệu khai phá.
 - [`reports/03_ket_qua_so_bo.md`](reports/03_ket_qua_so_bo.md) — kết quả, bảng số liệu và diễn giải.
 - [`reports/04_kiem_tra_chat_luong.md`](reports/04_kiem_tra_chat_luong.md) — kiểm tra bất biến dữ liệu đầu ra.
+- [`slides/valorant_mining_slides.pptx`](slides/valorant_mining_slides.pptx) — bộ slide bảo vệ 15 slide, có speaker notes; tạo lại bằng `make slides`.
 
 ### Notebook
 

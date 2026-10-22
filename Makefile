@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: all setup audit build cluster rules report validate clean
+.PHONY: all setup audit build cluster rules report validate slides clean
 
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -22,6 +22,9 @@ report:
 
 validate:
 	$(PYTHON) scripts/05_validate.py
+
+slides:
+	$(PYTHON) scripts/06_make_slides.py
 
 all: audit build cluster rules report validate
 

@@ -7,4 +7,6 @@ data/raw/*.sqlite
 data/processed/
 outputs/tables/
 reports/figures/
+slides/assets/
+slides/preview/
 .DS_Store
