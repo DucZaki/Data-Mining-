@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "valorant-mining"
+version = "0.1.0"
+description = "Player clustering and Agent association-rule mining on professional Valorant data"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scikit-learn>=1.3",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+    "mlxtend>=0.23",
+]
+
+[project.optional-dependencies]
+notebooks = ["jupyterlab>=4.0", "nbformat>=5.7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
