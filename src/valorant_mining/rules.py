@@ -8,8 +8,24 @@ import numpy as np
 import pandas as pd
 from mlxtend.frequent_patterns import association_rules, fpgrowth
 from mlxtend.preprocessing import TransactionEncoder
+from scipy.stats import fisher_exact
 
 from .config import DATA_PROCESSED, OUTPUT_TABLES, VALID_MAPS
+
+
+def benjamini_hochberg(p_values) -> np.ndarray:
+    """Benjamini-Hochberg adjusted p-values (q-values), no extra dependency."""
+    p = np.asarray(p_values, dtype=float)
+    n = len(p)
+    if n == 0:
+        return p
+    order = np.argsort(p)
+    ranked = p[order]
+    q = ranked * n / np.arange(1, n + 1)
+    q = np.minimum.accumulate(q[::-1])[::-1]
+    out = np.empty_like(q)
+    out[order] = np.clip(q, 0, 1)
+    return out
 
 
 def wilson_interval(wins: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -87,8 +103,18 @@ def mine_map_rules(
     for row in rules.itertuples():
         mask = df["agents_set"].apply(lambda s: row.antecedents.issubset(s))
         subset = df[mask & df["won"].notna()]
+        rest = df[(~mask) & df["won"].notna()]
         n = len(subset)
         wins = int(subset["won"].sum()) if n else 0
+        rest_n = len(rest)
+        rest_wins = int(rest["won"].sum()) if rest_n else 0
+        if n and rest_n:
+            _, p_value = fisher_exact(
+                [[wins, n - wins], [rest_wins, rest_n - rest_wins]],
+                alternative="two-sided",
+            )
+        else:
+            p_value = np.nan
         lo, hi = wilson_interval(wins, n)
         perf.append(
             {
@@ -97,6 +123,8 @@ def mine_map_rules(
                 "win_rate_with_antecedent": wins / n if n else np.nan,
                 "win_rate_ci_low": lo,
                 "win_rate_ci_high": hi,
+                "win_rate_without_antecedent": rest_wins / rest_n if rest_n else np.nan,
+                "fisher_p_value": p_value,
                 "map_baseline_win_rate": baseline,
             }
         )
@@ -130,6 +158,34 @@ def exact_compositions(comps: pd.DataFrame, min_teams: int = 8) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame()
     out = pd.concat(rows, ignore_index=True)
+    out = out.sort_values(["map", "n", "win_rate"], ascending=[True, False, False])
+
+    # Compare each composition with the other teams on the same map. This is a
+    # descriptive association test, not a causal estimate: team strength and
+    # composition choice are confounded.
+    p_values = []
+    rest_rates = []
+    for row in out.itertuples():
+        n = int(row.n)
+        wins = int(row.wins)
+        map_n = int(row.map_teams_labeled)
+        map_wins = int(round(row.map_win_rate * map_n))
+        rest_n = map_n - n
+        rest_wins = map_wins - wins
+        rest_rates.append(rest_wins / rest_n if rest_n else np.nan)
+        if n and rest_n:
+            _, p_value = fisher_exact(
+                [[wins, n - wins], [rest_wins, rest_n - rest_wins]],
+                alternative="two-sided",
+            )
+        else:
+            p_value = np.nan
+        p_values.append(p_value)
+    out["rest_win_rate"] = rest_rates
+    out["win_rate_diff_vs_rest"] = out["win_rate"] - out["rest_win_rate"]
+    out["fisher_p_value"] = p_values
+    out["fisher_q_bh"] = benjamini_hochberg(p_values)
+    out["significant_fdr"] = out["fisher_q_bh"] < 0.05
     return out.sort_values(["map", "n", "win_rate"], ascending=[True, False, False])
 
 
@@ -197,7 +253,9 @@ def composition_highlights(compositions: pd.DataFrame, min_n: int = 20) -> pd.Da
         return compositions
     out = compositions[compositions["n"] >= min_n].copy()
     out["ci_excludes_50"] = (out["win_rate_ci_low"] > 0.5) | (out["win_rate_ci_high"] < 0.5)
-    return out.sort_values(["ci_excludes_50", "win_rate"], ascending=[False, False])
+    return out.sort_values(
+        ["significant_fdr", "fisher_q_bh", "n"], ascending=[False, True, False]
+    )
 
 
 def run_rules(comps: pd.DataFrame) -> dict:
@@ -222,9 +280,12 @@ def run_rules(comps: pd.DataFrame) -> dict:
             "map", "antecedent", "consequent", "rule", "support", "confidence", "lift",
             "support_count", "n_teams", "antecedent_len", "consequent_len",
             "n_with_antecedent", "win_rate_with_antecedent", "win_rate_ci_low",
-            "win_rate_ci_high", "map_baseline_win_rate",
+            "win_rate_ci_high", "win_rate_without_antecedent", "fisher_p_value",
+            "map_baseline_win_rate",
         ]
         rules = rules[keep].sort_values(["map", "lift"], ascending=[True, False])
+        rules["fisher_q_bh"] = benjamini_hochberg(rules["fisher_p_value"])
+        rules["significant_fdr"] = rules["fisher_q_bh"] < 0.05
 
         cross = (
             rules.groupby(["antecedent", "consequent", "rule"], as_index=False)
@@ -264,6 +325,11 @@ def run_rules(comps: pd.DataFrame) -> dict:
             "top_rule": rules.iloc[0]["rule"] if not rules.empty else None,
             "top_lift": float(rules["lift"].max()) if not rules.empty else None,
             "exact_compositions_min8": int(len(compositions)),
+            "rules_fdr_significant": int(rules["significant_fdr"].sum()) if not rules.empty else 0,
+            "compositions_fdr_significant": int(compositions["significant_fdr"].sum())
+            if not compositions.empty
+            else 0,
+            "compositions_tested": int(len(compositions)),
         },
     }
 

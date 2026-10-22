@@ -9,8 +9,10 @@
 | Chỉ còn bản đồ thi đấu | PASS | team_compositions |
 | Số round trong khoảng 13–40 | PASS | team_compositions |
 | Nhãn thắng/thua chỉ là 0/1/NaN | PASS | team_compositions |
+| Nhãn thắng/thua khớp Games.Winner | PASS | 27,382 đội hình / 13,691 ván, 0 lệch |
 | Người chơi đủ ≥10 ván | PASS | player_features |
 | Người chơi đủ ≥100 round | PASS | player_features |
+| Độ phủ ACS/ADR/HS ≥80% | PASS | player_features |
 | Không thiếu biến mô hình | PASS | player_features |
 | Không trùng PlayerID | PASS | player_features |
 | Support trong (0, 1] | PASS | rules |
@@ -20,6 +22,6 @@
 | Đội hình chi tiết có đúng 5 Agent | PASS | exact_compositions |
 | Win rate trong [0, 1] | PASS | exact_compositions |
 
-**Tổng:** 17 kiểm tra, 0 lỗi.
+**Tổng:** 19 kiểm tra, 0 lỗi.
 
 Các kiểm tra này chỉ xác nhận tính nhất quán của dữ liệu đầu ra; không thay thế kiểm định thống kê cho các kết luận về thắng/thua.

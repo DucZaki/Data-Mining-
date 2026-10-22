@@ -10,6 +10,7 @@ from .config import (
     DATA_PROCESSED,
     MIN_GAMES_PER_PLAYER,
     MIN_ROUNDS_PER_PLAYER,
+    MIN_STAT_COVERAGE,
     MODEL_FEATURES,
 )
 
@@ -24,12 +25,14 @@ def build_player_features(scoreboard: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
     the number of rounds played in each map.
     """
     df = scoreboard.copy()
-    df = df[df["ACS"].notna()].copy()
     df["role"] = df["Agent"].map(AGENT_ROLES).fillna("other")
 
-    df["acs_x_rounds"] = df["ACS"] * df["rounds"]
-    df["adr_x_rounds"] = df["ADR"].fillna(0) * df["rounds"]
-    df["hs_x_rounds"] = df["HS_Percent"].fillna(0) * df["rounds"]
+    # Only average ACS/ADR/HS over maps where the value exists. Never impute 0:
+    # a missing ADR is not a player who dealt no damage.
+    for source, prefix in (("ACS", "acs"), ("ADR", "adr"), ("HS_Percent", "hs")):
+        df[f"{prefix}_x_rounds"] = (df[source] * df["rounds"]).fillna(0.0)
+        df[f"{prefix}_rounds"] = df["rounds"].where(df[source].notna(), 0)
+
     df["multi_kills"] = (
         df[["Num_2Ks", "Num_3Ks", "Num_4Ks", "Num_5Ks"]].fillna(0).sum(axis=1)
     )
@@ -46,8 +49,11 @@ def build_player_features(scoreboard: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
         first_deaths=("FirstDeaths", "sum"),
         multi_kills=("multi_kills", "sum"),
         acs_x_rounds=("acs_x_rounds", "sum"),
+        acs_rounds=("acs_rounds", "sum"),
         adr_x_rounds=("adr_x_rounds", "sum"),
+        adr_rounds=("adr_rounds", "sum"),
         hs_x_rounds=("hs_x_rounds", "sum"),
+        hs_rounds=("hs_rounds", "sum"),
         acs_sd=("ACS", lambda s: s.std(ddof=1) if len(s) > 1 else np.nan),
         agent_pool=("Agent", "nunique"),
         top_agent=("Agent", lambda s: s.mode().iat[0] if len(s.mode()) else s.iloc[0]),
@@ -61,9 +67,12 @@ def build_player_features(scoreboard: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
     out["fk_pr"] = out["first_kills"] / out["rounds"]
     out["fd_pr"] = out["first_deaths"] / out["rounds"]
     out["multi_pr"] = out["multi_kills"] / out["rounds"]
-    out["acs"] = out["acs_x_rounds"] / out["rounds"]
-    out["adr"] = out["adr_x_rounds"] / out["rounds"]
-    out["hs"] = out["hs_x_rounds"] / out["rounds"]
+    out["acs"] = out["acs_x_rounds"] / out["acs_rounds"].replace(0, np.nan)
+    out["adr"] = out["adr_x_rounds"] / out["adr_rounds"].replace(0, np.nan)
+    out["hs"] = out["hs_x_rounds"] / out["hs_rounds"].replace(0, np.nan)
+    out["acs_coverage"] = out["acs_rounds"] / out["rounds"]
+    out["adr_coverage"] = out["adr_rounds"] / out["rounds"]
+    out["hs_coverage"] = out["hs_rounds"] / out["rounds"]
     out["acs_cv"] = out["acs_sd"] / out["acs"].replace(0, np.nan)
     out["rounds_per_game"] = out["rounds"] / out["games"]
 
@@ -95,6 +104,15 @@ def build_player_features(scoreboard: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
     out = out[
         (out["games"] >= MIN_GAMES_PER_PLAYER) & (out["rounds"] >= MIN_ROUNDS_PER_PLAYER)
     ].copy()
+
+    coverage_ok = out[["acs_coverage", "adr_coverage", "hs_coverage"]].min(axis=1) >= MIN_STAT_COVERAGE
+    attrition.append(
+        {
+            "step": f"Độ phủ ACS/ADR/HS ≥{MIN_STAT_COVERAGE:.0%}",
+            "players": int(coverage_ok.sum()),
+        }
+    )
+    out = out[coverage_ok].copy()
 
     attrition.append(
         {

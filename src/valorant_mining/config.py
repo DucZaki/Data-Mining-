@@ -20,6 +20,7 @@ for _dir in (DATA_PROCESSED, OUTPUT_TABLES, FIGURE_DIR):
 RANDOM_STATE = 42
 MIN_GAMES_PER_PLAYER = 10
 MIN_ROUNDS_PER_PLAYER = 100
+MIN_STAT_COVERAGE = 0.80
 
 # Only maps that appear often enough for per-map association rules.
 # "TBD" is not a playable map.
@@ -62,3 +63,11 @@ FEATURE_LABELS = {
 }
 
 MODEL_FEATURES = list(FEATURE_LABELS)
+
+# A lower-redundancy feature set used as a sensitivity check. ACS already
+# contains kills/damage; K/D is derived; multi-kill is strongly correlated with
+# ADR. Keep one variable per conceptual dimension (impact, survival, support,
+# opening, volatility, aim).
+REDUCED_FEATURES = ["acs", "deaths_pr", "assists_pr", "fk_pr", "fd_pr", "acs_sd", "hs"]
+
+PCA_VARIANCE_TARGET = 0.80

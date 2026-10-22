@@ -162,6 +162,12 @@ def collect_audit() -> dict:
         "round_history": rh_coverage,
         "team_validity": team_validity,
         "games": int(len(games)),
+        "games_rounds_gt_40": int(
+            ((games["Team1_TotalRounds"] + games["Team2_TotalRounds"]) > 40).sum()
+        ),
+        "games_rounds_lt_13": int(
+            ((games["Team1_TotalRounds"] + games["Team2_TotalRounds"]) < 13).sum()
+        ),
         "scoreboard_rows": int(n),
     }
     return audit
@@ -225,13 +231,13 @@ Tổng số PlayerID khác nhau: **{audit['players_total']}**.
 
 {md_table(audit['players_by_threshold'])}
 
-Ngưỡng mặc định của dự án là **≥ 10 ván** và **≥ 100 round**. Ngưỡng này giữ được {int(audit['players_by_threshold'].loc[audit['players_by_threshold']['min_games']==10, 'players'].iloc[0])} người chơi trước khi yêu cầu đủ biến mô hình.
+Ngưỡng mặc định của dự án là **≥ 10 ván** và **≥ 100 round**. Ngưỡng này giữ được {int(audit['players_by_threshold'].loc[audit['players_by_threshold']['min_games']==10, 'players'].iloc[0])} người chơi trước khi áp thêm yêu cầu độ phủ ACS/ADR/HS ≥80% và đủ biến mô hình.
 
 ## 5. Lịch sử round
 
 {md_table(audit['round_history'])}
 
-Khoảng {audit['round_history'].iloc[0]['coverage_pct']:.1f}% ván có RoundHistory. Trong số này, một số ít ván có tổng round của bảng Games không khớp với độ dài lịch sử round; các ván đó bị loại để tránh chia sai mẫu số khi tính chỉ số theo round.
+Khoảng {audit['round_history'].iloc[0]['coverage_pct']:.1f}% ván có RoundHistory. Trong số này, một số ít ván có tổng round của bảng Games không khớp với độ dài lịch sử round; các ván đó bị loại để tránh chia sai mẫu số khi tính chỉ số theo round. Trong bảng Games gốc có **{audit['games_rounds_gt_40']} ván** vượt 40 round (đều là 42 round) và **{audit['games_rounds_lt_13']} ván** dưới 13 round; ngưỡng 13–40 loại các ván này sau bước kiểm tra đội hình.
 
 ## 6. Chất lượng nhóm đội
 

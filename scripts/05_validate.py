@@ -11,12 +11,20 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import pandas as pd
 
-from valorant_mining.config import DATA_PROCESSED, MODEL_FEATURES, OUTPUT_TABLES, REPORT_DIR, VALID_MAPS
+from valorant_mining.config import (
+    DATA_PROCESSED,
+    MIN_STAT_COVERAGE,
+    MODEL_FEATURES,
+    OUTPUT_TABLES,
+    REPORT_DIR,
+    VALID_MAPS,
+)
 
 
 def main() -> None:
     players = pd.read_csv(DATA_PROCESSED / "player_features.csv")
     comps = pd.read_csv(DATA_PROCESSED / "team_compositions.csv")
+    games = pd.read_csv(DATA_PROCESSED / "clean_games.csv")
     rules = pd.read_csv(OUTPUT_TABLES / "agent_rules_by_map.csv")
     comps_detail = pd.read_csv(OUTPUT_TABLES / "exact_compositions.csv")
 
@@ -44,8 +52,46 @@ def main() -> None:
         set(comps["won"].dropna().unique()).issubset({0, 1}),
         "team_compositions",
     )
+
+    # Compare the derived team label with the independent Games.Winner column.
+    winner_check = comps.merge(
+        games[["GameID", "Team1", "Team2", "Winner", "team1_abbr", "team2_abbr"]],
+        on="GameID",
+        how="left",
+        validate="many_to_one",
+    )
+    winner_check["won_expected"] = pd.Series(float("nan"), index=winner_check.index)
+    is_team1 = winner_check["Winner"].eq(winner_check["Team1"])
+    is_team2 = winner_check["Winner"].eq(winner_check["Team2"])
+    winner_check.loc[is_team1, "won_expected"] = (
+        winner_check.loc[is_team1, "team"].eq(winner_check.loc[is_team1, "team1_abbr"]).astype(float)
+    )
+    winner_check.loc[is_team2, "won_expected"] = (
+        winner_check.loc[is_team2, "team"].eq(winner_check.loc[is_team2, "team2_abbr"]).astype(float)
+    )
+    comparable = winner_check[
+        winner_check["won"].notna() & winner_check["won_expected"].notna()
+    ].copy()
+    n_mismatch = int(
+        (comparable["won"].astype(int) != comparable["won_expected"].astype(int)).sum()
+    )
+    check(
+        "Nhãn thắng/thua khớp Games.Winner",
+        n_mismatch == 0,
+        f"{len(comparable):,} đội hình / {comparable['GameID'].nunique():,} ván, "
+        f"{n_mismatch} lệch",
+    )
+
     check("Người chơi đủ ≥10 ván", (players["games"] >= 10).all(), "player_features")
     check("Người chơi đủ ≥100 round", (players["rounds"] >= 100).all(), "player_features")
+    check(
+        f"Độ phủ ACS/ADR/HS ≥{MIN_STAT_COVERAGE:.0%}",
+        players[["acs_coverage", "adr_coverage", "hs_coverage"]]
+        .ge(MIN_STAT_COVERAGE)
+        .all()
+        .all(),
+        "player_features",
+    )
     check(
         "Không thiếu biến mô hình",
         players[MODEL_FEATURES].notna().all().all(),

@@ -1,4 +1,10 @@
-"""K-Means player clustering, model selection, stability and profiles."""
+"""K-Means player clustering, model selection, stability and profiles.
+
+The input block contains several strongly correlated combat metrics. To stop
+K-Means from effectively counting "combat impact" several times, the primary
+model runs on principal components that retain 80% of the variance. The raw
+feature profiles are still used to describe the resulting clusters.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +20,14 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import StandardScaler
 
-from .config import FEATURE_LABELS, FIGURE_DIR, MODEL_FEATURES, OUTPUT_TABLES, RANDOM_STATE
+from .config import (
+    FEATURE_LABELS,
+    MODEL_FEATURES,
+    OUTPUT_TABLES,
+    PCA_VARIANCE_TARGET,
+    RANDOM_STATE,
+    REDUCED_FEATURES,
+)
 
 
 def winsorize(X: pd.DataFrame, lower: float = 0.01, upper: float = 0.99) -> pd.DataFrame:
@@ -23,26 +36,33 @@ def winsorize(X: pd.DataFrame, lower: float = 0.01, upper: float = 0.99) -> pd.D
     return X.clip(lower=lo, upper=hi, axis=1)
 
 
-def prepare_matrix(players: pd.DataFrame) -> tuple[pd.DataFrame, StandardScaler, np.ndarray]:
-    raw = players[MODEL_FEATURES].astype(float)
+def _scale(players: pd.DataFrame, features: list[str]) -> tuple[pd.DataFrame, np.ndarray]:
+    raw = players[features].astype(float)
     clipped = winsorize(raw)
-    scaler = StandardScaler()
-    scaled = scaler.fit_transform(clipped)
-    return clipped, scaler, scaled
+    scaled = StandardScaler().fit_transform(clipped)
+    return clipped, scaled
 
 
-def evaluate_k(X_scaled: np.ndarray, k_min: int = 2, k_max: int = 8) -> pd.DataFrame:
+def prepare_matrix(players: pd.DataFrame) -> tuple[pd.DataFrame, PCA, np.ndarray]:
+    """Winsorize, standardize, then reduce collinear features with PCA."""
+    clipped, scaled = _scale(players, MODEL_FEATURES)
+    pca = PCA(n_components=PCA_VARIANCE_TARGET, svd_solver="full", random_state=RANDOM_STATE)
+    scores = pca.fit_transform(scaled)
+    return clipped, pca, scores
+
+
+def evaluate_k(X_cluster: np.ndarray, k_min: int = 2, k_max: int = 8) -> pd.DataFrame:
     rows = []
     for k in range(k_min, k_max + 1):
         model = KMeans(n_clusters=k, n_init=20, random_state=RANDOM_STATE)
-        labels = model.fit_predict(X_scaled)
+        labels = model.fit_predict(X_cluster)
         rows.append(
             {
                 "k": k,
                 "inertia": model.inertia_,
-                "silhouette": silhouette_score(X_scaled, labels),
-                "calinski_harabasz": calinski_harabasz_score(X_scaled, labels),
-                "davies_bouldin": davies_bouldin_score(X_scaled, labels),
+                "silhouette": silhouette_score(X_cluster, labels),
+                "calinski_harabasz": calinski_harabasz_score(X_cluster, labels),
+                "davies_bouldin": davies_bouldin_score(X_cluster, labels),
                 "smallest_cluster": int(np.bincount(labels).min()),
                 "largest_cluster": int(np.bincount(labels).max()),
             }
@@ -57,14 +77,14 @@ def choose_k(evaluation: pd.DataFrame, k_min: int = 3, k_max: int = 5) -> int:
     return int(candidates.loc[candidates["silhouette"].idxmax(), "k"])
 
 
-def fit_kmeans(X_scaled: np.ndarray, k: int) -> tuple[np.ndarray, KMeans]:
+def fit_kmeans(X_cluster: np.ndarray, k: int) -> tuple[np.ndarray, KMeans]:
     model = KMeans(n_clusters=k, n_init=50, random_state=RANDOM_STATE)
-    labels = model.fit_predict(X_scaled)
+    labels = model.fit_predict(X_cluster)
     return labels, model
 
 
 def stability_bootstrap(
-    X_scaled: np.ndarray,
+    X_cluster: np.ndarray,
     base_labels: np.ndarray,
     k: int,
     n_boot: int = 30,
@@ -72,11 +92,11 @@ def stability_bootstrap(
 ) -> pd.DataFrame:
     rng = np.random.default_rng(random_state)
     rows = []
-    n = len(X_scaled)
+    n = len(X_cluster)
     for i in range(n_boot):
         idx = rng.choice(n, size=int(n * 0.8), replace=False)
         model = KMeans(n_clusters=k, n_init=10, random_state=int(rng.integers(1_000_000)))
-        labels = model.fit_predict(X_scaled[idx])
+        labels = model.fit_predict(X_cluster[idx])
         rows.append(
             {
                 "bootstrap": i,
@@ -87,13 +107,71 @@ def stability_bootstrap(
     return pd.DataFrame(rows)
 
 
-def hierarchical_comparison(X_scaled: np.ndarray, k: int, base_labels: np.ndarray) -> dict:
+def hierarchical_comparison(X_cluster: np.ndarray, k: int, base_labels: np.ndarray) -> dict:
     model = AgglomerativeClustering(n_clusters=k, linkage="ward")
-    labels = model.fit_predict(X_scaled)
+    labels = model.fit_predict(X_cluster)
     return {
         "ari_kmeans_vs_ward": adjusted_rand_score(base_labels, labels),
-        "silhouette_ward": silhouette_score(X_scaled, labels),
+        "silhouette_ward": silhouette_score(X_cluster, labels),
     }
+
+
+def correlation_tables(players: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    corr = players[MODEL_FEATURES].corr().round(3)
+    rows = []
+    for i, left in enumerate(MODEL_FEATURES):
+        for right in MODEL_FEATURES[i + 1 :]:
+            value = corr.loc[left, right]
+            if abs(value) >= 0.70:
+                rows.append(
+                    {
+                        "feature_a": left,
+                        "feature_b": right,
+                        "correlation": float(value),
+                        "abs_correlation": float(abs(value)),
+                    }
+                )
+    high = pd.DataFrame(rows).sort_values("abs_correlation", ascending=False)
+    return corr, high
+
+
+def sensitivity_analysis(
+    players: pd.DataFrame, primary_labels: np.ndarray, k: int
+) -> pd.DataFrame:
+    """Compare the primary PCA model with the full and reduced raw-feature sets."""
+    rows = []
+    for name, features in (
+        ("PCA " + str(PCA_VARIANCE_TARGET), None),
+        ("11 biến gốc", MODEL_FEATURES),
+        ("7 biến rút gọn", REDUCED_FEATURES),
+    ):
+        if features is None:
+            _, pca, X = prepare_matrix(players)
+            labels = KMeans(n_clusters=k, n_init=50, random_state=RANDOM_STATE).fit_predict(X)
+            rows.append(
+                {
+                    "method": name,
+                    "n_features": pca.n_components_,
+                    "silhouette": silhouette_score(X, labels),
+                    "ari_vs_primary": 1.0,
+                    "cluster_sizes": np.bincount(labels).tolist(),
+                    "silhouette_space": "PCA",
+                }
+            )
+            continue
+        _, X = _scale(players, features)
+        labels = KMeans(n_clusters=k, n_init=50, random_state=RANDOM_STATE).fit_predict(X)
+        rows.append(
+            {
+                "method": name,
+                "n_features": len(features),
+                "silhouette": silhouette_score(X, labels),
+                "ari_vs_primary": adjusted_rand_score(primary_labels, labels),
+                "cluster_sizes": np.bincount(labels).tolist(),
+                "silhouette_space": "raw features",
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def cluster_profiles(players: pd.DataFrame, labels: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -158,19 +236,25 @@ def label_clusters(z: pd.DataFrame) -> dict[int, str]:
 
 
 def run_clustering(players: pd.DataFrame) -> dict:
-    clipped, scaler, X_scaled = prepare_matrix(players)
+    clipped, pca, X_cluster = prepare_matrix(players)
 
-    evaluation = evaluate_k(X_scaled, 2, 8)
+    evaluation = evaluate_k(X_cluster, 2, 8)
     k = choose_k(evaluation, 3, 5)
-    labels, model = fit_kmeans(X_scaled, k)
+    labels, model = fit_kmeans(X_cluster, k)
 
     evaluation["chosen"] = evaluation["k"] == k
-    silhouette_final = silhouette_score(X_scaled, labels)
-    stability = stability_bootstrap(X_scaled, labels, k)
-    ward = hierarchical_comparison(X_scaled, k, labels)
+    silhouette_final = silhouette_score(X_cluster, labels)
+    stability = stability_bootstrap(X_cluster, labels, k)
+    ward = hierarchical_comparison(X_cluster, k, labels)
+    sensitivity = sensitivity_analysis(players, labels, k)
+    correlation, high_correlation = correlation_tables(players)
 
-    pca = PCA(n_components=2, random_state=RANDOM_STATE)
-    coords = pca.fit_transform(X_scaled)
+    coords = X_cluster[:, :2]
+    loadings = pd.DataFrame(
+        pca.components_.T,
+        index=MODEL_FEATURES,
+        columns=[f"PC{i + 1}" for i in range(pca.n_components_)],
+    ).round(3)
 
     players = players.copy()
     players["cluster"] = labels
@@ -192,7 +276,9 @@ def run_clustering(players: pd.DataFrame) -> dict:
         "stability_min_ari": stability["ari_vs_full"].min(),
         "ward_ari": ward["ari_kmeans_vs_ward"],
         "ward_silhouette": ward["silhouette_ward"],
-        "pca_explained_variance": float(pca.explained_variance_ratio_.sum()),
+        "pca_components": int(pca.n_components_),
+        "pca_variance": float(pca.explained_variance_ratio_.sum()),
+        "visualization_variance": float(pca.explained_variance_ratio_[:2].sum()),
         "n_players": int(len(players)),
         "cluster_sizes": players.groupby("cluster").size().to_dict(),
         "cluster_labels": names,
@@ -206,6 +292,10 @@ def run_clustering(players: pd.DataFrame) -> dict:
         "raw_profiles": raw,
         "z_profiles": z,
         "summary": summary,
+        "sensitivity": sensitivity,
+        "correlation": correlation,
+        "high_correlation": high_correlation,
+        "pca_loadings": loadings,
         "pca_variance": pca.explained_variance_ratio_,
     }
 
@@ -216,6 +306,10 @@ def save_clustering(result: dict) -> None:
     result["stability"].to_csv(OUTPUT_TABLES / "cluster_stability.csv", index=False)
     result["raw_profiles"].to_csv(OUTPUT_TABLES / "cluster_profiles_raw.csv")
     result["z_profiles"].to_csv(OUTPUT_TABLES / "cluster_profiles_z.csv")
+    result["sensitivity"].to_csv(OUTPUT_TABLES / "clustering_sensitivity.csv", index=False)
+    result["correlation"].to_csv(OUTPUT_TABLES / "feature_correlation.csv")
+    result["high_correlation"].to_csv(OUTPUT_TABLES / "feature_correlation_high.csv", index=False)
+    result["pca_loadings"].to_csv(OUTPUT_TABLES / "pca_loadings.csv", index_label="feature")
     pd.Series(result["summary"], name="value").rename_axis("metric").to_csv(
         OUTPUT_TABLES / "clustering_summary.csv", header=True
     )

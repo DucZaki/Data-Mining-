@@ -95,8 +95,9 @@ def plot_clustering(result: dict) -> None:
         ax=ax,
     )
     ax.set_title(
-        f"Không gian PCA 2D của hồ sơ người chơi (k = {chosen}, "
-        f"{result['pca_variance'].sum():.1%} phương sai)"
+        f"PC1–PC2 của không gian cụm PCA (k = {chosen}, "
+        f"{result['summary']['pca_variance']:.1%} phương sai, "
+        f"{result['summary']['pca_components']} thành phần)"
     )
     ax.set_xlabel("PC1")
     ax.set_ylabel("PC2")

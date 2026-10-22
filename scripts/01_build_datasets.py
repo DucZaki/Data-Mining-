@@ -76,7 +76,7 @@ def main() -> None:
         "- Số multi-kill (2K–5K) trên mỗi round",
         "- Độ lệch chuẩn ACS giữa các ván (độ ổn định)",
         "",
-        "KAST bị loại vì thiếu gần như toàn bộ. Tỷ lệ chọn vai trò Agent chỉ dùng để mô tả cụm, không đưa vào mô hình.",
+        "KAST bị loại vì thiếu gần như toàn bộ. ACS/ADR/HS% chỉ lấy trung bình trên các ván có giá trị, không thay giá trị thiếu bằng 0; người chơi có độ phủ dưới 80% bị loại. Trước K-Means, các biến được winsorize, chuẩn hóa và giảm chiều bằng PCA giữ ≥80% phương sai. Tỷ lệ chọn vai trò Agent chỉ dùng để mô tả cụm, không đưa vào mô hình.",
         "",
         "## 5. File sinh ra",
         "",

@@ -73,7 +73,7 @@ Tổng số PlayerID khác nhau: **8596**.
 | 30 | 1520 |
 | 50 | 942 |
 
-Ngưỡng mặc định của dự án là **≥ 10 ván** và **≥ 100 round**. Ngưỡng này giữ được 2976 người chơi trước khi yêu cầu đủ biến mô hình.
+Ngưỡng mặc định của dự án là **≥ 10 ván** và **≥ 100 round**. Ngưỡng này giữ được 2976 người chơi trước khi áp thêm yêu cầu độ phủ ACS/ADR/HS ≥80% và đủ biến mô hình.
 
 ## 5. Lịch sử round
 
@@ -81,7 +81,7 @@ Ngưỡng mặc định của dự án là **≥ 10 ván** và **≥ 100 round**
 |---|---|---|---|
 | 15888 | 14854 | 95.64 | 34 |
 
-Khoảng 95.6% ván có RoundHistory. Trong số này, một số ít ván có tổng round của bảng Games không khớp với độ dài lịch sử round; các ván đó bị loại để tránh chia sai mẫu số khi tính chỉ số theo round.
+Khoảng 95.6% ván có RoundHistory. Trong số này, một số ít ván có tổng round của bảng Games không khớp với độ dài lịch sử round; các ván đó bị loại để tránh chia sai mẫu số khi tính chỉ số theo round. Trong bảng Games gốc có **4 ván** vượt 40 round (đều là 42 round) và **28 ván** dưới 13 round; ngưỡng 13–40 loại các ván này sau bước kiểm tra đội hình.
 
 ## 6. Chất lượng nhóm đội
 

@@ -17,17 +17,17 @@ Dự án dùng cơ sở dữ liệu `data/raw/valorant.sqlite` (4 bảng: `Match
 |---|---|
 | Ván còn sau làm sạch | **14.005 / 15.888** ván |
 | Đội hình 5 Agent | **28.010** team-map, **27.382** có nhãn thắng/thua |
-| Người chơi đủ điều kiện | **2.724** (≥10 ván, ≥100 round) |
-| Phân cụm | **k = 3**, silhouette = **0,202**, bootstrap ARI = **0,966** |
-| Luật kết hợp | **580 luật** trên 7 bản đồ |
+| Người chơi đủ điều kiện | **2.599** (≥10 ván, ≥100 round, độ phủ ACS/ADR/HS ≥80%) |
+| Phân cụm | **k = 3**, silhouette = **0,278**, bootstrap ARI = **0,954**, Ward ARI = **0,354** |
+| Luật kết hợp | **580 luật** trên 7 bản đồ; **17** luật còn q < 0,05 sau BH |
 
 Ba nhóm người chơi:
 
-- **C0 — Mở giao tranh · Sát thương cao** (772 người): First kills/round, ACS, Kills/round cao nhất.
-- **C1 — Chết nhiều · Hiệu quả thấp** (871 người): K/D, ACS, ADR thấp nhất; Deaths/round cao.
-- **C2 — Ít chết · Hiệu quả cao** (1.081 người): Assists/round, K/D, HS% cao; Deaths/round thấp.
+- **C0 — Mở giao tranh · Sát thương cao** (760 người): First kills/round, ACS, Kills/round cao nhất.
+- **C1 — Chết nhiều · Hiệu quả thấp** (849 người): K/D, ACS, ADR thấp nhất; Deaths/round cao.
+- **C2 — Ít chết · Hiệu quả cao** (990 người): Assists/round, K/D, HS% cao; Deaths/round thấp.
 
-Phát hiện chính: các tổ hợp Agent rất phổ biến theo map (Icebox gần như cố định Viper–Sage–Sova), nhưng **tỷ lệ thắng của các tổ hợp phổ biến phần lớn không khác 50% có ý nghĩa thống kê**. Đồng xuất hiện không chứng minh hiệu quả.
+Phát hiện chính: các tổ hợp Agent rất phổ biến theo map (Icebox gần như cố định Viper–Sage–Sova), nhưng **phần lớn khác biệt tỷ lệ thắng không bền sau kiểm định Fisher và hiệu chỉnh Benjamini–Hochberg**. Trong 473 đội hình đủ mẫu, chỉ 3 còn khác biệt có ý nghĩa sau FDR. Đồng xuất hiện không chứng minh hiệu quả.
 
 Xem báo cáo đầy đủ:
 
@@ -105,15 +105,17 @@ Thời gian chạy toàn bộ khoảng 1–3 phút trên laptop thông thường
 - Số round lấy từ `RoundHistory` nếu có; nếu không, lấy tổng round của bảng `Games`. Ván có RoundHistory mâu thuẫn bị loại.
 - Chỉ giữ 7 bản đồ thi đấu; loại `TBD`.
 - Không thay KAST thiếu bằng 0; loại KAST khỏi mô hình.
-- Nhãn thắng/thua được suy ra từ điểm cuối và ánh xạ đội qua RoundHistory.
+- Nhãn thắng/thua được suy ra từ điểm cuối và ánh xạ đội qua RoundHistory; `scripts/05_validate.py` đối chiếu lại với cột gốc `Games.Winner`.
 
 ### 6.2. Phân cụm người chơi
 
 - Tổng hợp theo PlayerID, chia theo **tổng số round** để không ưu tiên ván overtime.
 - Biến: Kills/round, Deaths/round, Assists/round, K/D, ACS, ADR, FK/round, FD/round, multi-kill/round, độ lệch chuẩn ACS, HS%.
+- ACS/ADR/HS% chỉ lấy trung bình trên các ván có giá trị, không thay giá trị thiếu bằng 0. Người chơi có độ phủ dưới 80% bị loại.
 - Winsorize 1%–99%, sau đó StandardScaler.
+- Giảm đa cộng tuyến bằng PCA trước K-Means: giữ các thành phần giải thích ≥80% phương sai (3 thành phần, 82,1%). Chân dung cụm vẫn mô tả bằng 11 biến gốc.
 - K-Means với k = 2..8, chọn k trong khoảng 3–5 theo silhouette và khả năng diễn giải.
-- Đánh giá: silhouette, Calinski–Harabasz, Davies–Bouldin, elbow, bootstrap ARI (30 lần), so sánh Ward.
+- Đánh giá: silhouette, Calinski–Harabasz, Davies–Bouldin, elbow, bootstrap ARI (30 lần), so sánh Ward; bảng độ nhạy với 11 biến gốc và 7 biến rút gọn.
 - Tỷ lệ vai trò Agent chỉ dùng để mô tả cụm, **không** đưa vào mô hình.
 
 ### 6.3. Luật kết hợp Agent
@@ -122,6 +124,7 @@ Thời gian chạy toàn bộ khoảng 1–3 phút trên laptop thông thường
 - FP-Growth, tối đa 3 Agent/itemset, support tối thiểu `max(12 đội, 2%)` mỗi map.
 - Giữ luật confidence ≥ 0,40 và lift ≥ 1,05; bảng báo cáo lọc thêm n ≥ 30, confidence ≥ 0,5.
 - Báo cáo support, confidence, lift, số đội hình và tỷ lệ thắng khi có vế trái (kèm Wilson 95%).
+- So sánh win rate với phần còn lại của cùng map bằng Fisher exact; hiệu chỉnh Benjamini–Hochberg cho toàn bộ luật và toàn bộ đội hình.
 - Phân tích riêng từng map; so sánh patch lớn và tỷ lệ chọn Agent.
 
 ## 7. Notebook
@@ -137,11 +140,12 @@ Các notebook dùng lại module trong `src/`, nên kết quả luôn khớp v�
 - Dữ liệu chỉ đến **2022-01-08**, không đại diện meta hiện tại.
 - KAST thiếu **97,9%**, không dùng.
 - Không có vũ khí, tọa độ giao tranh, kỹ năng Agent, kill log.
-- Chỉ 14.005/15.888 ván đủ điều kiện đội hình; có thể có thiên lệch chọn mẫu.
+- Chỉ 14.005/15.888 ván đủ điều kiện đội hình; có thể có thiên lệch chọn mẫu. Ngưỡng 13–40 round loại thêm 4 ván có tổng 42 round.
+- 126 người chơi bị loại vì độ phủ ADR/HS dưới 80%; thiếu dữ liệu có thể không ngẫu nhiên.
 - Breeze/Fracture ít trận; luật hai map này kém ổn định.
 - Luật kết hợp chỉ là đồng xuất hiện, không phải nhân quả.
-- Phân cụm chịu ảnh hưởng của Agent role; chưa tách hoàn toàn “phong cách” khỏi “vai trò”.
-- Các so sánh tỷ lệ thắng chưa hiệu chỉnh multiple comparisons.
+- Phân cụm chịu ảnh hưởng của Agent role; chưa tách hoàn toàn “phong cách” khỏi “vai trò”. Kết quả cũng thay đổi khi dùng tập biến rút gọn (ARI 0,473 so với mô hình chính).
+- Đã kiểm định Fisher và hiệu chỉnh BH, nhưng đây vẫn là phân tích khám phá; chưa có hold-out theo thời gian và chưa kiểm soát chất lượng đội.
 
 ## 9. Hướng phát triển
 
