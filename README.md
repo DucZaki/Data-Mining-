@@ -1,6 +1,6 @@
 # Valorant Competitive Data Mining
 
-**Phân cụm người chơi theo phong cách thi đấu và khai phá tổ hợp Agent theo bản đồ**
+**Phân cụm người chơi, khai phá tổ hợp Agent và so sánh mô hình dự đoán thắng theo đội hình**
 
 Dự án khai phá dữ liệu trên các trận đấu Valorant chuyên nghiệp giai đoạn **05/2020 – 01/2022**. Mục tiêu không chỉ là mô tả dữ liệu, mà là xây dựng các kết quả có thể kiểm chứng, có kiểm định thống kê và có thể tái lập bằng một lệnh.
 
@@ -92,7 +92,12 @@ Tuy nhiên, **đồng xuất hiện không chứng minh hiệu quả**. Sau ki�
 │   ├── 02_cluster_players.py
 │   ├── 03_agent_rules.py
 │   ├── 04_make_report.py
+│   ├── 09_build_public_dashboard.py
+│   ├── 10_build_vct_player_profiles.py
 │   └── 05_validate.py
+├── dashboard/
+│   ├── index.html                    # trang tra cứu công khai theo map
+│   └── predictor_diagnostics.html   # trang chẩn đoán mô hình
 ├── notebooks/
 │   ├── 01_tong_quan_du_lieu.ipynb
 │   ├── 02_phan_cum_nguoi_choi.ipynb
@@ -153,6 +158,8 @@ Repo đã kèm sẵn `data/raw/valorant.sqlite` (~76 MB), nên không cần copy
 
 ```bash
 make all
+# Trên Windows hoặc khi không có make:
+python scripts/run_pipeline.py
 ```
 
 Pipeline lần lượt chạy:
@@ -163,8 +170,30 @@ Pipeline lần lượt chạy:
 | 2 | `make build` | `clean_games`, `team_compositions`, `player_features`, `player_attrition` |
 | 3 | `make cluster` | cụm người chơi, bảng đánh giá, hình PCA |
 | 4 | `make rules` | luật kết hợp theo map, bảng đội hình, hình |
-| 5 | `make report` | `reports/03_ket_qua_so_bo.md` |
-| 6 | `make validate` | `reports/04_kiem_tra_chat_luong.md` |
+| 5 | `make predict` | so sánh mô hình, bootstrap CI, phân tích theo map/tháng |
+| 6 | `make diagnostics` | `dashboard/predictor_diagnostics.html` tự chứa |
+| 7 | `make dashboard` | `dashboard/index.html`: tra cứu Agent, đội hình, cặp Agent và chỉ số tuyển thủ |
+| 8 | `make vct-profiles` | Tải VCT Reference và tạo `vct_player_profiles.csv` từ thống kê thật; `make dashboard` dùng file này cho biểu đồ tuyển thủ |
+| 7 | `make test` | test ghép cặp đội, chia thời gian, bootstrap |
+| 8 | `make validate` | `reports/04_kiem_tra_chat_luong.md` |
+
+`make all` tập trung vào mã nguồn và thực nghiệm; báo cáo markdown cũ có thể tạo riêng bằng `make report`. Bước dự đoán tạo `predictor_comparison.csv`, `predictor_test_predictions.csv`, `predictor_split.json`, `predictor_by_map.csv`, `predictor_by_month.csv`, `predictor_calibration.csv` trong `outputs/tables/` và hình `reports/figures/predictor_comparison.png`. Trang chẩn đoán đọc đúng các CSV này, không tự tính lại mô hình.
+
+### Trang tra cứu dành cho người xem
+
+Sau `make all`, chạy `python -m http.server 8765` tại thư mục dự án rồi mở `http://127.0.0.1:8765/dashboard/`. Trang chính cho chọn map và giai đoạn, xem lượt chọn/tỉ lệ thắng Agent, đội hình 5 Agent đã thi đấu, cặp Agent phổ biến và hồ sơ tuyển thủ. Phần hồ sơ tuyển thủ có radar ACS, ADR, K/D, assists/round, first kills/round và KAST với bộ lọc mùa và tên. `dashboard/index.html` được tạo lại bằng `python scripts/09_build_public_dashboard.py` từ hai nguồn đã xử lý. Giao diện tập trung vào kết quả cho người xem. Chi tiết nguồn và cách tính nằm trong tài liệu hướng dẫn; phần map/đội hình và hồ sơ tuyển thủ là hai phạm vi dữ liệu riêng.
+
+Hướng dẫn từng bước cho đồ án: [`docs/huong_dan_thuc_hien.md`](docs/huong_dan_thuc_hien.md).
+
+### So sánh hai phương pháp boosting hiện đại
+
+`scripts/07_compare_predictors.py` so sánh **LightGBM** và **CatBoost** với hồi quy logistic và mốc dự đoán tỷ lệ thắng của tập train. Một quan sát là một ván có đủ hai đội hình và nhãn thắng. Đội được dự đoán được chọn theo thứ tự chữ cái của mã đội; cách này tránh việc cột `Team1` của dữ liệu đã bị lệch về đội thắng. Biến đầu vào chỉ gồm map, patch và hiệu số chọn từng Agent giữa hai đội. Không đưa điểm số, kết quả round hoặc thống kê sau trận vào mô hình.
+
+Train lấy các ngày trước 22/09/2021, test lấy 22/09/2021–08/01/2022. Các ván của cùng một trận luôn thuộc một phía của ranh giới. Không dùng test để chọn siêu tham số. Bảng CSV báo cáo accuracy, ROC AUC, log loss, Brier và thời gian chạy. Chênh lệch hiệu năng nhỏ, vì vậy không được diễn giải như bằng chứng Agent gây ra thắng trận.
+
+Khoảng tin cậy 95% của chênh lệch log loss được tính bằng 2.000 lần bootstrap theo `MatchID`, giữ các ván cùng trận trong một khối. Kết quả theo map/tháng và bảng hiệu chỉnh xác suất giúp phát hiện nơi mô hình suy giảm. Trong tập test, 2.138/2.509 ván thuộc patch chưa xuất hiện trong train; đây là dịch chuyển phân phối quan trọng. Mở `dashboard/predictor_diagnostics.html` bằng trình duyệt để xem một trang tự chứa, có bộ lọc mô hình theo map; hoặc xem các phần mới trong `notebooks/04_dashboard_truc_quan.ipynb`.
+
+**Nguồn dữ liệu:** `data/raw/valorant.sqlite` là snapshot đi kèm repo. Repo chưa ghi URL upstream, ngày thu thập và giấy phép gốc; `big_data/docs/source_inventory.md` cũng xác nhận thiếu thông tin này. Cần xác minh trước khi công bố hoặc tái phân phối ra ngoài phạm vi học tập.
 
 Thời gian chạy khoảng **1–2 phút** trên laptop thông thường. Kết quả được cố định bằng `random_state`, nên chạy lại cho cùng số liệu.
 
@@ -271,7 +300,7 @@ Các notebook dùng lại module trong `src/`, nên kết quả luôn khớp v�
 
 ### Dữ liệu
 
-Dữ liệu được cung cấp trong `valorant.sqlite`, gồm các trận đấu chuyên nghiệp từ tháng 5/2020 đến tháng 1/2022. Dự án không tải lại dữ liệu từ nguồn ngoài.
+Dữ liệu được cung cấp trong `valorant.sqlite`, gồm các trận đấu chuyên nghiệp từ tháng 5/2020 đến tháng 1/2022. Phần hồ sơ tuyển thủ tải VCT Reference riêng bằng `scripts/10_build_vct_player_profiles.py`.
 
 | Bảng | Ý nghĩa |
 |---|---|

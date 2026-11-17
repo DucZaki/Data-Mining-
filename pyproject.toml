@@ -15,6 +15,9 @@ dependencies = [
     "matplotlib>=3.7",
     "seaborn>=0.12",
     "mlxtend>=0.23",
+    "catboost>=1.2",
+    "lightgbm>=4.0",
+    "duckdb>=1.0",
 ]
 
 [project.optional-dependencies]

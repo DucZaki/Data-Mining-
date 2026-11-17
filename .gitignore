@@ -5,6 +5,7 @@ __pycache__/
 data/raw/*.sqlite
 !data/raw/valorant.sqlite
 data/processed/
+data/external/*.duckdb
 outputs/tables/
 reports/figures/
 slides/assets/
