@@ -1,78 +1,34 @@
-# Hướng dẫn thực hiện đồ án và chạy mã
+# Cách thực hiện đồ án theo chương trình học
 
-Tài liệu này là hướng dẫn triển khai, chưa phải báo cáo hay slide theo mẫu trường.
+1. Xác định ba mục tiêu. Phân nhóm tuyển thủ, tìm Agent đồng xuất hiện theo map và dự đoán thắng từ đội hình.
+2. Kiểm tra kích thước, thuộc tính, giá trị thiếu, ngoại lệ và khóa dữ liệu bằng scripts/00_audit_data.py.
+3. Tạo dữ liệu sạch bằng scripts/01_build_datasets.py. Tổng hợp chỉ số theo round và lọc người chơi đủ số ván, số round, độ phủ.
+4. Chọn 7 đặc trưng gồm ADR, deaths/round, assists/round, first kills/round, first deaths/round, độ lệch chuẩn ACS và HS. Tránh đưa đồng thời nhiều biến sát thương tương quan cao.
+5. Chặn giá trị ở phân vị 1%–99% rồi chuẩn hóa Z-score. Khoảng cách Euclidean khi đó sử dụng các biến có thang đo tương đương.
+6. Chạy K-Means với k từ 2 đến 8. Chọn silhouette cao nhất, mô tả kích thước và đặc trưng từng cụm. So sánh Average linkage cùng k. Average linkage hợp nhất hai cụm có khoảng cách trung bình giữa các cặp điểm nhỏ nhất.
+7. Xem mỗi đội hình là một giao dịch gồm năm Agent. Chạy Apriori và FP-Growth cùng support tối thiểu max(12/n, 0,02), độ dài tập tối đa 3, confidence ≥0,4 và lift ≥1,05. Kiểm tra tập phổ biến giống nhau, so sánh thời gian.
+8. Tạo một dòng dự đoán cho mỗi ván. Đội đích chọn theo thứ tự chữ cái của mã đội. Chỉ dùng map, patch và chênh lệch lựa chọn Agent hai đội.
+9. Chia train/test theo ngày. Huấn luyện Logistic Regression, Random Forest và AdaBoost trên cùng train. Random Forest dùng 300 cây, max_depth=8, min_samples_leaf=30. AdaBoost dùng 200 cây gốc một mức, learning_rate=0,05. Tham số định trước, không chọn theo test.
+10. Đọc accuracy, AUC, log loss và Brier. So mốc tần suất train, bootstrap 2.000 lần theo MatchID để có khoảng tin cậy của mức cải thiện.
+11. Tạo dashboard và chạy unit tests, kiểm tra đầu ra. Radar tuyển thủ là trực quan hóa các chỉ số thật.
+12. Kết luận từ CSV vừa sinh. Phân tích dữ liệu cũ, khác biệt vai trò và thiếu sức mạnh đội/đối thủ. Average linkage có thể tạo nhóm nhỏ nên cần xét kích thước cụm.
 
-## 1. Xác định bài toán và nguồn
-
-**Câu hỏi cho người xem:** Trên từng map, Agent và đội hình 5 người nào được các đội thi đấu chọn? Tỉ lệ thắng quan sát được ra sao? Hồ sơ sáu chỉ số của một tuyển thủ trong cùng mùa/map trông thế nào?
-
-Hai nguồn có phạm vi khác nhau và được giữ riêng:
-
-- `data/raw/valorant.sqlite`: 14.005 ván sạch, 28.010 lượt đội hình, từ 05/2020 đến 01/2022. Dùng cho map, Agent, tổ hợp và dự đoán thắng.
-- [VCT Reference](https://vct-reference.com/dataset): tệp DuckDB 13 MB, gồm 10 bảng. Bảng `player_map` có 73.976 dòng tuyển thủ–map trong bản tải này, mùa 2021–2026. Dùng cho radar tuyển thủ. Trang nguồn cho phép sử dụng dữ liệu và mô tả chi tiết phạm vi, độ phủ; xem thêm [methodology](https://vct-reference.com/methodology).
-
-Đã đối chiếu các nguồn khác: [Kaggle LAN đến 05/2022](https://www.kaggle.com/datasets/aadeshmishra/valorant-esports-player-stats-at-lan-till-may-2022) và [Kaggle Champions Istanbul 2022](https://www.kaggle.com/datasets/shihouinyoruichi/valorant-champions-2022-istanbul-stats) hẹp hơn về thời gian/giải; bộ [Hugging Face gameplay-data](https://huggingface.co/datasets/xiaoluo11/valorant-gameplay-data) là 12 mẫu ảnh/video, không phải bảng chỉ số thi đấu. Vì vậy phần radar dùng VCT Reference. Không gán số liệu mô phỏng cho tuyển thủ thật.
-
-## 2. Khảo sát và kiểm tra dữ liệu
-
-Chạy `python scripts/00_audit_data.py` để xem kích thước, khóa, map, phân phối và thiếu dữ liệu của SQLite. Chạy `python scripts/10_build_vct_player_profiles.py` để lấy nguồn VCT và tạo hồ sơ. Bảng scoreboard gốc có ACS và ADR ở hơn 96% dòng, nhưng `KAST_Percent` chỉ có ở khoảng **2,2%**; không điền 0 hay đoán KAST từ K/D. Metadata `data/processed/vct_player_profiles_source.json` lưu URL, SHA-256 và phạm vi ngày để truy xuất nguồn.
-
-Kiểm tra giá trị bất thường: số round hợp lệ 13–40; tỉ lệ KAST 0–100%; K/D hữu hạn; Agent mỗi đội đủ 5 và không trùng; một GameID có đúng hai đội; kết quả thắng khớp `Games.Winner`. Các lỗi kiểu dữ liệu cũng cần kiểm tra: KAST trong DuckDB là `TINYINT`, phải đổi sang số thực **trước** khi nhân với số round để tránh tràn số nguyên.
-
-## 3. Tiền xử lý và tạo đặc trưng
-
-Chạy `python scripts/01_build_datasets.py` để làm sạch trận, scoreboard và đội hình. Với hồ sơ tuyển thủ VCT:
-
-- Chỉ giữ trận hoàn tất, bỏ showmatch, chỉ dùng dòng có đủ sáu chỉ số và round hợp lệ.
-- Yêu cầu độ phủ của sáu chỉ số ít nhất 80%; tối thiểu 20 map cho hồ sơ cả mùa hoặc 5 ván cho hồ sơ một map.
-- ACS, ADR, KAST: trung bình **theo số round**. K/D: tổng kills / tổng deaths. Hỗ trợ và mở giao tranh: assists / round và first kills / round.
-- Radar dùng **phân vị** của từng chỉ số trong nhóm tuyển thủ đủ điều kiện cùng mùa và map. Sáu chỉ số thật vẫn hiện bên cạnh; phân vị chỉ phục vụ so sánh trong nhóm, không phải điểm kỹ năng tuyệt đối.
-
-Đầu ra: `data/processed/vct_player_profiles.csv` với `player_id`, tên, mùa, map, số ván, độ phủ, sáu chỉ số thật và sáu phân vị. Mã tạo: `src/valorant_mining/player_radar.py`, `scripts/10_build_vct_player_profiles.py`.
-
-## 4. Phương pháp khai phá và đối chứng
-
-Radar là **trực quan hóa mô tả**, không phải thuật toán dự đoán. Phần khai phá của đồ án sử dụng:
-
-1. **PCA + K-Means** phân cụm 2.599 người chơi đủ dữ liệu; so silhouette, bootstrap ARI và phân cụm Ward.
-2. **FP-Growth** tìm Agent đồng xuất hiện theo map; đánh giá support, confidence, lift. So sánh win rate đội hình bằng khoảng Wilson, Fisher exact và hiệu chỉnh Benjamini–Hochberg.
-3. **LightGBM và CatBoost** là hai thuật toán hiện đại để so sánh với logistic regression và mốc tần suất thắng train. Chia tập theo ngày, giữ cùng một trận trong một tập, đánh giá trên tương lai bằng AUC, log loss, Brier và bootstrap theo `MatchID`.
-
-Không gọi tương quan giữa Agent/đội hình và thắng là quan hệ nhân quả. Chất lượng đội, đối thủ, bản cập nhật và chiến thuật đều có thể gây nhiễu.
-
-## 5. Thực nghiệm và bảng kết quả cần kiểm tra
-
-Chạy `python scripts/run_pipeline.py` để tạo lại các bảng. Đọc `outputs/tables/clustering_summary.csv`, `agent_rules_summary.csv`, `exact_compositions.csv`, `predictor_comparison.csv`, `predictor_by_map.csv`, `vct_player_profiles.csv` (trong `data/processed`). Bản chạy hiện có:
-
-| Hạng mục | Kết quả | Cách diễn giải |
-|---|---:|---|
-| Ván sạch / lượt đội hình | 14.005 / 28.010 | Hai đội trên mỗi ván |
-| Luật kết hợp | 580 | Đồng xuất hiện, chưa chứng minh hiệu quả |
-| K-Means, k=3 | silhouette 0,278 | Mức tách cụm vừa phải |
-| LightGBM | AUC 0,540; log loss 0,6892 | Tốt hơn mốc rất ít; CI bootstrap chạm 0 |
-| CatBoost | AUC 0,539; log loss 0,6905 | Tốt hơn mốc rất ít; CI bootstrap chạm 0 |
-| Hồ sơ tuyển thủ VCT | 6.285 hồ sơ; 652 tuyển thủ | Sáu chỉ số đủ độ phủ theo mùa/map |
-
-So sánh hai mô hình dự đoán dựa trên cùng 2.509 ván test, không so độ chính xác của hai tập khác nhau. Trong phần phân tích, trình bày ví dụ cụ thể theo map/Agent/tuyển thủ, kèm cỡ mẫu và khoảng tin cậy. Kiểm tra thay đổi khi lọc mùa/map và đối chiếu với giai đoạn dữ liệu.
-
-## 6. Trực quan hóa và kiểm thử
-
-`python scripts/09_build_public_dashboard.py` tạo `dashboard/index.html`. Mở bằng `python -m http.server 8765` rồi vào `http://127.0.0.1:8765/dashboard/`. Thử bộ lọc map, giai đoạn, mùa VCT và tên tuyển thủ. Kiểm tra radar đổi theo tuyển thủ, sáu chỉ số gốc vẫn khớp CSV, nhóm ít mẫu không được vẽ. Chạy `python -m unittest discover -s tests -v` và `python scripts/05_validate.py`.
-
-## 7. Kết luận, hạn chế và hướng phát triển
-
-Kết luận phải tách hai nguồn. Phần map/đội hình đến 01/2022 là lịch sử; hồ sơ tuyển thủ VCT đến 10/2026 thuộc mẫu giải tier 1, không được trộn hai phạm vi thành một tỉ lệ chung. KAST trong SQLite gốc thiếu gần hết, nên nguồn VCT được dùng cho biểu đồ riêng. Phân vị có thể đổi khi lọc mùa/map và không kiểm soát vai trò Agent hoặc chất lượng đối thủ. Mô hình thắng hiện chỉ cải thiện nhỏ so với mốc.
-
-Hướng tiếp theo: so sánh tuyển thủ **cùng vai trò**, phân tích xu hướng theo patch, bộ dựng đội hình 5 Agent và kiểm định trên dữ liệu giải mới. Nếu cần tạo dữ liệu mô phỏng để thử giao diện, đặt file ở `data/synthetic/`, gắn `is_synthetic=true` và không trộn vào kết quả thực nghiệm hoặc kết luận.
-
-## Lệnh chạy từ đầu
+## Các lệnh
 
 ```powershell
-git clone https://github.com/DucZaki/Data-Mining-.git
-cd Data-Mining-
 python -m pip install -r requirements.txt
 python scripts/run_pipeline.py
-python -m http.server 8765
+python scripts/04_make_report.py
+python -m http.server 8765 --bind 127.0.0.1
 ```
 
-Pipeline tự tải VCT Reference lần đầu qua `scripts/10_build_vct_player_profiles.py`. Muốn cập nhật VCT về bản mới, xóa riêng `data/external/vct.duckdb`, chạy lại script này rồi tạo lại dashboard. Khi cập nhật nguồn, ghi ngày tải và SHA-256 trong metadata; không so trực tiếp bản mới với kết quả cũ mà thiếu thông tin phiên bản.
+## Đầu ra cần dùng khi thuyết trình
+
+- outputs/tables/cluster_evaluation.csv để giải thích chọn k.
+- outputs/tables/clustering_summary.csv và cluster_profiles_raw.csv để mô tả cụm.
+- outputs/tables/association_comparison.csv để so sánh Apriori và FP-Growth.
+- outputs/tables/predictor_comparison.csv để so sánh ba mô hình với mốc.
+- reports/figures/02_cluster_features.png hiển thị ADR và deaths/round theo Z-score.
+- reports/03_ket_qua_so_bo.md là bản tổng hợp sinh từ dữ liệu.
+
+Các phương pháp chính đều thuộc danh sách đã học. Chúng là thuật toán kinh điển. Yêu cầu “hai phương pháp mới nhất” của giảng viên cần được xác nhận riêng khi chốt nội dung.

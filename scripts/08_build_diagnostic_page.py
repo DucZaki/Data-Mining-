@@ -47,7 +47,7 @@ footer{border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font
 </style></head><body><div class="wrap">
 <header class="hero"><div class="eyebrow">Khai phá dữ liệu Valorant · Chẩn đoán ngoài mẫu</div>
 <h1>Đội hình Agent dự đoán thắng đến đâu?</h1>
-<p class="lead">So sánh LightGBM, CatBoost và hồi quy logistic trên những ván diễn ra sau tập huấn luyện. Trang này đọc trực tiếp kết quả pipeline, chỉ ra mức cải thiện, độ bất định và nơi mô hình suy giảm.</p>
+<p class="lead">So sánh Random Forest, AdaBoost và hồi quy logistic trên những ván diễn ra sau tập huấn luyện. Trang này đọc trực tiếp kết quả pipeline, chỉ ra mức cải thiện, độ bất định và nơi mô hình suy giảm.</p>
 <div class="meta"><span id="dateRange"></span><span id="datasetSize"></span><span>Đơn vị: một ván có hai đội hình hợp lệ</span><span>Chỉ dùng map, patch và Agent trước kết quả</span></div></header>
 <nav aria-label="Mục lục"><a href="#quality">01 Chất lượng</a><a href="#comparison">02 So sánh</a><a href="#maps">03 Theo map</a><a href="#time">04 Theo tháng</a><a href="#calibration">05 Hiệu chỉnh</a><a href="#limits">06 Cách đọc</a></nav>
 <div class="kpis" id="kpis"></div><div class="notice" id="bias"></div>
@@ -57,13 +57,13 @@ footer{border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font
 <section id="comparison"><div class="kicker">02 · SO SÁNH MÔ HÌNH</div><h2>Cải thiện nhỏ và chưa chắc chắn</h2>
 <p class="muted">Log loss và Brier càng thấp càng tốt; AUC 0,5 tương đương xếp hạng ngẫu nhiên. Cột Δ là log loss của mốc tần suất train trừ log loss mô hình; dương là tốt hơn. Khoảng tin cậy 95% lấy mẫu lại theo MatchID.</p>
 <div class="scroll"><table class="data" aria-label="Bảng mô hình" id="modelTable"><thead><tr><th>Mô hình</th><th>Accuracy</th><th>AUC</th><th>Log loss</th><th>Brier</th><th>Δ log loss</th><th>CI 95% của Δ</th></tr></thead><tbody></tbody></table></div>
-<p class="small">Cả LightGBM và CatBoost có khoảng tin cậy chạm 0. Dữ liệu chưa đủ để khẳng định chắc chắn chúng hơn mốc tần suất trên giai đoạn test này.</p></section>
-<section id="maps"><div class="section-head"><div><div class="kicker">03 · PHÂN TÍCH LỖI</div><h2>Khác biệt lớn giữa các bản đồ</h2></div><div class="control"><label for="mapModel">Mô hình</label><select id="mapModel"><option>LightGBM</option><option>CatBoost</option></select></div></div>
+<p class="small">So sánh khoảng tin cậy của Δ log loss với 0 để đánh giá mức cải thiện so với mốc.</p></section>
+<section id="maps"><div class="section-head"><div><div class="kicker">03 · PHÂN TÍCH LỖI</div><h2>Khác biệt lớn giữa các bản đồ</h2></div><div class="control"><label for="mapModel">Mô hình</label><select id="mapModel"><option>Random Forest</option><option>AdaBoost</option></select></div></div>
 <div class="scroll"><table class="data" aria-label="Hiệu năng theo bản đồ" id="mapTable"><thead><tr><th>Bản đồ</th><th>Số ván test</th><th>Tỷ lệ thắng</th><th>AUC</th><th>Log loss</th><th>Δ so với mốc</th></tr></thead><tbody></tbody></table></div><p class="small">Fracture chỉ có 99 ván test. Không xếp hạng chiến thuật từ một nhóm nhỏ hoặc từ Δ của một map riêng lẻ.</p></section>
 <section id="time"><div class="kicker">04 · DỊCH CHUYỂN THEO THỜI GIAN</div><h2>Hiệu năng thay đổi giữa các tháng</h2><p class="muted">Δ log loss so với mốc train theo tháng trong tập test. Điểm cuối có ít ván hơn; biểu đồ mô tả sự thay đổi, không thay thế kiểm định độc lập.</p>
-<div class="chart" id="monthChart" role="img" aria-label="Biểu đồ mức giảm log loss theo tháng"></div><div class="legend"><span><b style="background:var(--teal)"></b>LightGBM</span><span><b style="background:var(--red)"></b>CatBoost</span><span>Đường ngang: mốc không cải thiện</span></div></section>
+<div class="chart" id="monthChart" role="img" aria-label="Biểu đồ mức giảm log loss theo tháng"></div><div class="legend"><span><b style="background:var(--teal)"></b>Random Forest</span><span><b style="background:var(--red)"></b>AdaBoost</span><span>Đường ngang: mốc không cải thiện</span></div></section>
 <section id="calibration"><div class="kicker">05 · HIỆU CHỈNH XÁC SUẤT</div><h2>Điểm 60% có đáng tin?</h2><p class="muted">Mỗi điểm là một phân vị dự đoán trên tập test. So sánh xác suất trung bình với tỷ lệ thắng thực tế trong nhóm đó; đường chéo là hiệu chỉnh lý tưởng.</p>
-<div class="chart" id="calChart" role="img" aria-label="Biểu đồ hiệu chỉnh xác suất"></div><div class="legend"><span><b style="background:var(--teal)"></b>LightGBM</span><span><b style="background:var(--red)"></b>CatBoost</span><span>Đường chéo: lý tưởng</span></div></section>
+<div class="chart" id="calChart" role="img" aria-label="Biểu đồ hiệu chỉnh xác suất"></div><div class="legend"><span><b style="background:var(--teal)"></b>Random Forest</span><span><b style="background:var(--red)"></b>AdaBoost</span><span>Đường chéo: lý tưởng</span></div></section>
 <section id="limits"><div class="kicker">06 · CÁCH ĐỌC ĐÚNG</div><h2>Tín hiệu dự đoán khác tác động chiến thuật</h2>
 <p>Mô hình không thấy sức mạnh đội, lịch sử gần đây, chiến thuật hoặc tình trạng người chơi. Những yếu tố đó vừa ảnh hưởng chọn Agent, vừa ảnh hưởng thắng trận. Vì vậy kết quả không chứng minh Agent gây ra chiến thắng.</p>
 <p>Snapshot dừng ở tháng 01/2022; meta hiện tại có thể khác. Repo gốc chưa ghi rõ upstream của file SQLite. Muốn kiểm định thêm cần các giai đoạn test mới và dữ liệu đội có trước trận.</p></section>
@@ -73,10 +73,10 @@ const fmt=(x,n=3)=>Number(x).toFixed(n).replace('.',','); const pct=x=>fmt(x*100
 const split=DATA.split, summary=DATA.summary;
 document.querySelector('#dateRange').textContent=split.test_first+' đến '+split.test_last;
 document.querySelector('#datasetSize').textContent=split.n_train.toLocaleString('vi-VN')+' train / '+split.n_test.toLocaleString('vi-VN')+' test';
-const best=summary.find(x=>x.model==='LightGBM'); const unseen=split.unseen_patch_test_games;
+const best=summary.find(x=>x.model==='Random Forest'); const unseen=split.unseen_patch_test_games;
 document.querySelector('#kpis').innerHTML=[
  ['Ván test',split.n_test.toLocaleString('vi-VN'),'trên '+split.n_test_matches.toLocaleString('vi-VN')+' trận'],
- ['AUC LightGBM',fmt(best.test_roc_auc),'0,5 là ngẫu nhiên'],
+ ['AUC Random Forest',fmt(best.test_roc_auc),'0,5 là ngẫu nhiên'],
  ['Δ log loss',signed(best.delta_log_loss_vs_baseline),'CI 95%: '+signed(best.delta_ci_low)+' đến '+signed(best.delta_ci_high)],
  ['Patch chưa thấy',pct(unseen/split.n_test),unseen.toLocaleString('vi-VN')+' ván test']]
  .map(([v,a,b])=>'<div class="kpi"><strong>'+a+'</strong><span>'+v+'</span><small>'+b+'</small></div>').join('');
@@ -90,12 +90,12 @@ function svgLine(container,series,xValues,yMin,yMax,xLabel,yLabel,reference){con
  xValues.forEach((v,i)=>html+='<text x="'+X(i)+'" y="'+(H-33)+'" text-anchor="middle" fill="#afbec7" font-size="13">'+v+'</text>');
  series.forEach(s=>{html+='<polyline fill="none" stroke="'+s.color+'" stroke-width="3" points="'+s.values.map((v,i)=>X(i)+','+Y(v)).join(' ')+'"/>';s.values.forEach((v,i)=>html+='<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="4" fill="'+s.color+'"/>')});
  html+='<text x="'+(W/2)+'" y="'+(H-4)+'" text-anchor="middle" fill="#afbec7" font-size="14">'+xLabel+'</text><text transform="translate(17 '+H/2+') rotate(-90)" text-anchor="middle" fill="#afbec7" font-size="14">'+yLabel+'</text></svg>';container.innerHTML=html}
-const months=[...new Set(DATA.months.map(x=>x.month))];const modelColors={LightGBM:'#27c8b5',CatBoost:'#ff5a67'};
-svgLine(document.querySelector('#monthChart'),['LightGBM','CatBoost'].map(model=>({color:modelColors[model],values:months.map(m=>DATA.months.find(x=>x.model===model&&x.month===m).delta_log_loss_vs_baseline)})),months,-.012,.012,'Tháng test','Δ log loss',0);
+const months=[...new Set(DATA.months.map(x=>x.month))];const modelColors={'Random Forest':'#27c8b5',AdaBoost:'#ff5a67'};
+svgLine(document.querySelector('#monthChart'),['Random Forest','AdaBoost'].map(model=>({color:modelColors[model],values:months.map(m=>DATA.months.find(x=>x.model===model&&x.month===m).delta_log_loss_vs_baseline)})),months,Math.min(-.005,...DATA.months.filter(x=>x.model==='Random Forest'||x.model==='AdaBoost').map(x=>x.delta_log_loss_vs_baseline))-.002,Math.max(.005,...DATA.months.filter(x=>x.model==='Random Forest'||x.model==='AdaBoost').map(x=>x.delta_log_loss_vs_baseline))+.002,'Tháng test','Δ log loss',0);
 const cal=DATA.calibration;const deciles=[...new Set(cal.map(x=>x.decile))];const W=980,H=300,L=74,R=20,T=22,B=58;const X=v=>L+(v-.35)*(W-L-R)/.35,Y=v=>T+(.7-v)*(H-T-B)/.35;let c='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg">';
 for(let v=.35;v<=.701;v+=.05){c+='<line x1="'+X(v)+'" x2="'+X(v)+'" y1="'+T+'" y2="'+(H-B)+'" stroke="#344451"/><line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v)+'" y2="'+Y(v)+'" stroke="#344451"/><text x="'+X(v)+'" y="'+(H-33)+'" text-anchor="middle" fill="#afbec7" font-size="12">'+fmt(v,2)+'</text><text x="'+(L-8)+'" y="'+(Y(v)+4)+'" text-anchor="end" fill="#afbec7" font-size="12">'+fmt(v,2)+'</text>'}
 c+='<line x1="'+X(.35)+'" y1="'+Y(.35)+'" x2="'+X(.7)+'" y2="'+Y(.7)+'" stroke="#f3bc58" stroke-dasharray="6 5"/>';
-for(const model of ['LightGBM','CatBoost']){const rows=cal.filter(x=>x.model===model);c+='<polyline fill="none" stroke="'+modelColors[model]+'" stroke-width="3" points="'+rows.map(x=>X(x.mean_predicted)+','+Y(x.observed_win_rate)).join(' ')+'"/>';rows.forEach(x=>c+='<circle cx="'+X(x.mean_predicted)+'" cy="'+Y(x.observed_win_rate)+'" r="4" fill="'+modelColors[model]+'"/>')}
+for(const model of ['Random Forest','AdaBoost']){const rows=cal.filter(x=>x.model===model);c+='<polyline fill="none" stroke="'+modelColors[model]+'" stroke-width="3" points="'+rows.map(x=>X(x.mean_predicted)+','+Y(x.observed_win_rate)).join(' ')+'"/>';rows.forEach(x=>c+='<circle cx="'+X(x.mean_predicted)+'" cy="'+Y(x.observed_win_rate)+'" r="4" fill="'+modelColors[model]+'"/>')}
 c+='<text x="'+W/2+'" y="'+(H-4)+'" text-anchor="middle" fill="#afbec7" font-size="14">Xác suất dự đoán</text><text transform="translate(17 '+H/2+') rotate(-90)" text-anchor="middle" fill="#afbec7" font-size="14">Tỷ lệ thắng</text></svg>';document.querySelector('#calChart').innerHTML=c;
 </script></body></html>'''
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)

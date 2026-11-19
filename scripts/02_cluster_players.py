@@ -29,7 +29,7 @@ def main() -> None:
     print(f"\nk chọn: {summary['k']}")
     print(f"Silhouette: {summary['silhouette']:.3f}")
     print(f"Độ ổn định bootstrap (ARI trung bình): {summary['stability_mean_ari']:.3f}")
-    print(f"ARI K-Means vs Ward: {summary['ward_ari']:.3f}")
+    print(f"ARI K-Means vs Average linkage: {summary['average_ari']:.3f}")
     print("\nKích thước cụm:")
     for cluster, size in summary["cluster_sizes"].items():
         print(f"  C{cluster}: {size} người chơi — {summary['cluster_labels'][cluster]}")

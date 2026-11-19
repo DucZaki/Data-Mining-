@@ -85,8 +85,8 @@ def plot_clustering(result: dict) -> None:
     fig, ax = plt.subplots(figsize=(8.5, 6))
     sns.scatterplot(
         data=players,
-        x="pca1",
-        y="pca2",
+        x="plot_x",
+        y="plot_y",
         hue="cluster_label",
         palette="tab10",
         s=28,
@@ -94,15 +94,11 @@ def plot_clustering(result: dict) -> None:
         linewidth=0,
         ax=ax,
     )
-    ax.set_title(
-        f"PC1–PC2 của không gian cụm PCA (k = {chosen}, "
-        f"{result['summary']['pca_variance']:.1%} phương sai, "
-        f"{result['summary']['pca_components']} thành phần)"
-    )
-    ax.set_xlabel("PC1")
-    ax.set_ylabel("PC2")
+    ax.set_title(f"K-Means (k = {chosen}), hiển thị hai đặc trưng")
+    ax.set_xlabel("ADR (Z-score)")
+    ax.set_ylabel("Deaths / round (Z-score)")
     ax.legend(title="Cụm", bbox_to_anchor=(1.02, 1), loc="upper left")
-    _save(fig, "02_cluster_pca.png")
+    _save(fig, "02_cluster_features.png")
 
     z = result["z_profiles"][MODEL_FEATURES]
     z.index = [f"C{i}: {result['summary']['cluster_labels'][i]}" for i in z.index]

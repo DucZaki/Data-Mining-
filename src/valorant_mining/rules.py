@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import math
+import time
 
 import numpy as np
 import pandas as pd
-from mlxtend.frequent_patterns import association_rules, fpgrowth
+from mlxtend.frequent_patterns import association_rules, fpgrowth, apriori
 from mlxtend.preprocessing import TransactionEncoder
 from scipy.stats import fisher_exact
 
@@ -348,3 +349,33 @@ def save_rules(result: dict) -> None:
     pd.Series(result["summary"], name="value").rename_axis("metric").to_csv(
         OUTPUT_TABLES / "agent_rules_summary.csv", header=True
     )
+
+
+def compare_itemset_algorithms(comps: pd.DataFrame) -> pd.DataFrame:
+    """Benchmark equal support/max_len settings and verify identical itemsets."""
+    rows = []
+    for map_name in VALID_MAPS:
+        group = comps[(comps["Map"] == map_name) & (comps["n_agents"] == 5)]
+        baskets = group["agents_str"].str.split("|").tolist()
+        encoder = TransactionEncoder()
+        encoded = encoder.fit(baskets).transform(baskets)
+        frame = pd.DataFrame(encoded, columns=encoder.columns_)
+        support = max(12 / len(group), .02)
+        reference = None
+        for name, algorithm in (("Apriori", apriori), ("FP-Growth", fpgrowth)):
+            started = time.perf_counter()
+            itemsets = algorithm(frame, min_support=support, max_len=3, use_colnames=True)
+            elapsed = time.perf_counter() - started
+            canonical = {tuple(sorted(row.itemsets)): round(row.support, 10)
+                         for row in itemsets.itertuples()}
+            if reference is None:
+                reference = canonical
+            if canonical != reference:
+                raise ValueError(f"Different frequent itemsets on {map_name}")
+            rules = association_rules(itemsets, metric="confidence", min_threshold=.4)
+            rules = rules[rules["lift"] >= 1.05]
+            rows.append({"map": map_name, "algorithm": name, "teams": len(group),
+                         "min_support": support, "max_len": 3,
+                         "itemsets": len(itemsets), "rules": len(rules),
+                         "seconds": elapsed, "identical_itemsets": True})
+    return pd.DataFrame(rows)

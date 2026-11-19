@@ -11,13 +11,16 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import pandas as pd
 
-from valorant_mining.config import DATA_PROCESSED, FIGURE_DIR
+from valorant_mining.config import DATA_PROCESSED, FIGURE_DIR, OUTPUT_TABLES
 from valorant_mining.plotting import plot_composition_volume, plot_rules
-from valorant_mining.rules import run_rules, save_rules
+from valorant_mining.rules import run_rules, save_rules, compare_itemset_algorithms
 
 
 def main() -> None:
     comps = pd.read_csv(DATA_PROCESSED / "team_compositions.csv")
+    comparison = compare_itemset_algorithms(comps)
+    comparison.to_csv(OUTPUT_TABLES / "association_comparison.csv", index=False)
+    print(comparison.to_string(index=False))
     result = run_rules(comps)
     save_rules(result)
     plot_rules(result)

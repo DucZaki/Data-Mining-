@@ -19,8 +19,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from catboost import CatBoostClassifier
-from lightgbm import LGBMClassifier
+from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, brier_score_loss, log_loss, roc_auc_score
@@ -152,12 +152,12 @@ def main() -> None:
                               ("num", "passthrough", numeric)])
     models = {
         "Logistic Regression": make_pipeline(prep, LogisticRegression(max_iter=1000, C=1.0)),
-        "LightGBM": make_pipeline(prep, LGBMClassifier(n_estimators=250, learning_rate=0.03,
-                                num_leaves=15, max_depth=5, min_child_samples=50,
-                                reg_lambda=5.0, verbosity=-1, random_state=42, n_jobs=4)),
-        "CatBoost": CatBoostClassifier(iterations=350, depth=5, learning_rate=0.035,
-                              l2_leaf_reg=8, loss_function="Logloss", verbose=False,
-                              random_seed=42, thread_count=4, allow_writing_files=False),
+        "Random Forest": make_pipeline(prep, RandomForestClassifier(
+            n_estimators=300, max_depth=8, min_samples_leaf=30,
+            max_features="sqrt", random_state=42, n_jobs=4)),
+        "AdaBoost": make_pipeline(prep, AdaBoostClassifier(
+            estimator=DecisionTreeClassifier(max_depth=1, random_state=42),
+            n_estimators=200, learning_rate=0.05, random_state=42)),
     }
     rows = []
     pred = test[["GameID", "MatchID", "date", "Map", "won"]].copy()
@@ -170,12 +170,8 @@ def main() -> None:
                  "fit_predict_seconds": 0.0})
     for name, model in models.items():
         start = time.perf_counter()
-        if name == "CatBoost":
-            model.fit(X_train, y_train, cat_features=categorical)
-            p = model.predict_proba(X_test)[:, 1]
-        else:
-            model.fit(X_train, y_train)
-            p = model.predict_proba(X_test)[:, 1]
+        model.fit(X_train, y_train)
+        p = model.predict_proba(X_test)[:, 1]
         elapsed = time.perf_counter() - start
         pred[name] = p
         rows.append({"model": name, "n_train": len(train), "n_test": len(test),

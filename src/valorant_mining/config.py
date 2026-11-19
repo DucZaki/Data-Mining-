@@ -70,4 +70,4 @@ MODEL_FEATURES = list(FEATURE_LABELS)
 # opening, volatility, aim).
 REDUCED_FEATURES = ["acs", "deaths_pr", "assists_pr", "fk_pr", "fd_pr", "acs_sd", "hs"]
 
-PCA_VARIANCE_TARGET = 0.80
+CLUSTER_FEATURES = ["adr", "deaths_pr", "assists_pr", "fk_pr", "fd_pr", "acs_sd", "hs"]
