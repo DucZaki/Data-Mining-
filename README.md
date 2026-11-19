@@ -2,6 +2,10 @@
 
 Tra cứu Agent và đội hình theo map, phân nhóm tuyển thủ, dự đoán thắng từ lựa chọn Agent.
 
+## Đọc để hiểu và bảo vệ đồ án
+
+[Giải thích mục tiêu, dữ liệu, thuật toán, kết quả và dàn ý thuyết trình](docs/giai_thich_do_an_va_bao_ve.md).
+
 ## Chạy chương trình
 
 Yêu cầu Python 3.11 trở lên.
