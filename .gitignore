@@ -11,3 +11,10 @@ reports/figures/
 slides/assets/
 slides/preview/
 .DS_Store
+
+# Keep these folders local only
+/docs/
+/scripts/
+/slides/
+/notebooks/
+/reports/
