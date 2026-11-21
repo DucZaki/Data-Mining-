@@ -2,22 +2,29 @@
 
 Tra cứu Agent và đội hình theo map, phân nhóm tuyển thủ, dự đoán thắng từ lựa chọn Agent.
 
-## Đọc để hiểu và bảo vệ đồ án
+## Tập dữ liệu
 
-[Giải thích mục tiêu, dữ liệu, thuật toán, kết quả và dàn ý thuyết trình](docs/giai_thich_do_an_va_bao_ve.md).
+Dữ liệu chính được lưu tại `data/raw/valorant.sqlite`, bao gồm các trận thi đấu Valorant trong giai đoạn 2020–2022.
 
-## Chạy chương trình
+- `Matches`: thông tin trận đấu, thời gian, giải đấu và thể thức.
+- `Games`: bản đồ thi đấu, đội tham gia và điểm số.
+- `Game_Scoreboard`: Agent và chỉ số thi đấu của từng tuyển thủ trên mỗi bản đồ.
+- `Game_Rounds`: lịch sử từng round, kết quả và thông tin kinh tế khi có dữ liệu.
 
-Yêu cầu Python 3.11 trở lên.
+Các chỉ số gồm ACS, ADR, kills, deaths, assists, KAST, HS%, first kills và first deaths. Một số trường có dữ liệu thiếu, cần xử lý trước khi phân tích.
 
-```powershell
-python -m pip install -r requirements.txt
-python scripts/run_pipeline.py
-python -m http.server 8765 --bind 127.0.0.1
-```
+Sau làm sạch, dữ liệu có 14.005 ván, 28.010 lượt đội hình và 2.599 tuyển thủ đủ điều kiện phân cụm.
 
-Mở http://127.0.0.1:8765/dashboard/ để xem kết quả cho người xem.
-Trang chẩn đoán mô hình ở /dashboard/predictor_diagnostics.html.
+Hồ sơ radar tuyển thủ sử dụng bộ dữ liệu riêng từ [VCT Reference](https://vct-reference.com/dataset), gồm ACS, ADR, K/D, hỗ trợ/round, first kills/round và KAST. Metadata của nguồn này được lưu tại `data/processed/vct_player_profiles_source.json` khi tạo dữ liệu.
+
+## Thông tin tra cứu
+
+- Tần suất lựa chọn và tỉ lệ thắng của Agent theo bản đồ.
+- Đội hình phổ biến và các nhóm Agent thường được sử dụng cùng nhau.
+- Hồ sơ chỉ số và phân nhóm tuyển thủ theo đặc điểm thi đấu.
+- Kết quả dự đoán thắng dựa trên lựa chọn Agent.
+
+Thống kê đội hình phản ánh dữ liệu lịch sử 2020–2022. Tỉ lệ thắng quan sát được không bảo đảm hiệu quả trong các phiên bản hiện tại.
 
 ## Phương pháp
 
@@ -28,20 +35,18 @@ Trang chẩn đoán mô hình ở /dashboard/predictor_diagnostics.html.
 - Logistic Regression, Random Forest và AdaBoost dự đoán thắng trên cùng tập test thời gian sau.
 - Bootstrap theo MatchID, Wilson, Fisher exact và hiệu chỉnh BH dùng để đánh giá độ bất định.
 
-## Dữ liệu và kết quả
+## Xem giao diện
 
-SQLite gốc tại data/raw/valorant.sqlite. Sau làm sạch có 14.005 ván, 28.010 lượt đội hình và 2.599 người chơi đủ điều kiện phân cụm.
-Hồ sơ radar dùng nguồn VCT Reference riêng, tự tải qua scripts/10_build_vct_player_profiles.py.
-Metadata và SHA-256 được ghi trong data/processed/vct_player_profiles_source.json.
+Từ thư mục dự án, chạy:
 
-Các CSV kết quả ở outputs/tables/. Tạo bản tổng hợp bằng python scripts/04_make_report.py.
-Hướng dẫn chi tiết ở docs/huong_dan_thuc_hien.md.
-Dữ liệu gốc đội hình thuộc 2020–2022. Hiệu suất dự đoán phải đọc cùng mốc tần suất train và khoảng tin cậy.
+```powershell
+python -m http.server 8765 --bind 127.0.0.1
+```
+
+Mở [dashboard](http://127.0.0.1:8765/dashboard/) để xem các thống kê đã được tạo sẵn.
 
 ## Cấu trúc
 
 - src/valorant_mining/ chứa làm sạch, đặc trưng, phân cụm, luật, trực quan hóa.
-- scripts/ chứa các bước pipeline và sinh dashboard.
-- notebooks/ chứa notebook thực nghiệm.
 - dashboard/ chứa giao diện và trang chẩn đoán.
 - tests/ kiểm tra tính đúng đắn của dữ liệu và thực nghiệm.
