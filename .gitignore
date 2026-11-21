@@ -7,7 +7,6 @@ data/raw/*.sqlite
 data/processed/
 data/external/*.duckdb
 outputs/tables/
-reports/figures/
 slides/assets/
 slides/preview/
 .DS_Store
@@ -17,4 +16,3 @@ slides/preview/
 /scripts/
 /slides/
 /notebooks/
-/reports/
