@@ -23,8 +23,9 @@ function radarSvg(profile){
 function currentProfiles(){return DATA.players.filter(p=>p.season===playerSeason)}
 function renderPlayer(){
   const profile=currentProfiles().find(p=>p.player_id===playerId);
-  if(!profile){$('#playerName').textContent='Không có tuyển thủ';$('#radarChart').innerHTML='';$('#playerRaw').innerHTML='';$('#playerMetrics').innerHTML='';return}
+  if(!profile){$('#playerName').textContent='Không có tuyển thủ';$('#radarChart').innerHTML='';$('#playerRaw').innerHTML='';$('#playerMetrics').innerHTML='';$('#playerCluster').innerHTML='';return}
   $('#playerName').textContent=profile.player_name;
+  renderSelectedCluster(profile);
   $('#radarChart').innerHTML=radarSvg(profile);
   $('#radarChart').setAttribute('aria-label',`Biểu đồ phân vị của ${profile.player_name}, mùa ${profile.season}`);
   $('#playerRaw').innerHTML=PLAYER_METRICS.map(metric=>`<span><b>${valueText(profile,metric)}</b>${metric.label}</span>`).join('');
